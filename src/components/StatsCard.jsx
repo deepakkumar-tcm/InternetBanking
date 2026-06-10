@@ -14,7 +14,7 @@ export default function StatsCard({ title, value, change, changeType = 'positive
   return (
     <div
       id={id}
-      className="relative overflow-hidden rounded-xl border border-border bg-white p-6 shadow-sm hover:shadow-lg transition-all duration-300 group"
+      className="relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm hover:shadow-lg transition-all duration-300 group"
     >
       <div className="flex items-start justify-between">
         <div className="space-y-2">

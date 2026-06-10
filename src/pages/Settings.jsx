@@ -3,301 +3,301 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { User, Shield, Bell, Gauge, Save, Upload, Eye, EyeOff } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
+import { Slider } from '@/components/ui/slider'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { User, Shield, Bell, Gauge, Save, Upload, Eye, EyeOff, Info, Loader2, Trash2, Smartphone, ShieldCheck, History, Laptop } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function Settings() {
   const [showPassword, setShowPassword] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [upiLimit, setUpiLimit] = useState([100000])
+  const [posLimit, setPosLimit] = useState([50000])
+  const [onlineLimit, setOnlineLimit] = useState([200000])
 
   useEffect(() => {
     console.log("[ROUTE] Current path:", window.location.pathname)
-    console.log("[ROUTE] Navigation state:", window.history.state)
   }, [])
 
+  const handleSave = (section) => {
+    setIsSaving(true)
+    setTimeout(() => {
+      setIsSaving(false)
+      toast.success(`${section} updated successfully!`, {
+        description: `Your ${section.toLowerCase()} changes have been saved to our secure servers.`
+      })
+    }, 1500)
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in" id="settings-page">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-        <p className="text-sm text-gray-500 mt-1">Manage your account preferences and security</p>
+    <div className="space-y-8 animate-fade-in" id="settings-page">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">System Configuration</h2>
+          <p className="text-sm text-muted-foreground font-medium">Manage your digital identity, security vaults, and interface preferences</p>
+        </div>
+        <AlertDialog>
+           <AlertDialogTrigger asChild>
+             <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5 border-destructive/20 font-bold">
+               <Trash2 className="h-4 w-4 mr-2" /> Reset All
+             </Button>
+           </AlertDialogTrigger>
+           <AlertDialogContent id="alert-reset-settings">
+             <AlertDialogHeader>
+               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+               <AlertDialogDescription>
+                 This action will revert all your personalized settings, limits, and notification preferences to the bank defaults. This cannot be undone.
+               </AlertDialogDescription>
+             </AlertDialogHeader>
+             <AlertDialogFooter>
+               <AlertDialogCancel>Cancel Protocol</AlertDialogCancel>
+               <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => toast.success('Settings reset to default')}>
+                 Reset Settings
+               </AlertDialogAction>
+             </AlertDialogFooter>
+           </AlertDialogContent>
+        </AlertDialog>
       </div>
 
-      <Tabs defaultValue="profile">
-        <TabsList className="w-full justify-start gap-1" id="settings-tabs">
-          <TabsTrigger value="profile">
-            <User className="h-4 w-4 mr-2" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger value="security">
-            <Shield className="h-4 w-4 mr-2" />
-            Security
-          </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Bell className="h-4 w-4 mr-2" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="limits">
-            <Gauge className="h-4 w-4 mr-2" />
-            Limits
-          </TabsTrigger>
+      <Tabs defaultValue="profile" className="space-y-6">
+        <TabsList id="settings-tabs" className="bg-muted/50 p-1">
+          <TabsTrigger value="profile" className="data-[state=active]:bg-background data-[state=active]:shadow-sm"><User className="h-4 w-4 mr-2" />Profile</TabsTrigger>
+          <TabsTrigger value="security" className="data-[state=active]:bg-background data-[state=active]:shadow-sm"><Shield className="h-4 w-4 mr-2" />Security</TabsTrigger>
+          <TabsTrigger value="notifications" className="data-[state=active]:bg-background data-[state=active]:shadow-sm"><Bell className="h-4 w-4 mr-2" />Notifications</TabsTrigger>
+          <TabsTrigger value="limits" className="data-[state=active]:bg-background data-[state=active]:shadow-sm"><Gauge className="h-4 w-4 mr-2" />Limits</TabsTrigger>
         </TabsList>
 
-        {/* Profile Tab */}
-        <TabsContent value="profile">
-          <Card>
-            <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Update your personal details and contact information</CardDescription>
+        {/* ─── Profile ─── */}
+        <TabsContent value="profile" className="space-y-4">
+          <Card className="border-border/50">
+            <CardHeader className="pb-6 border-b border-border/20">
+              <CardTitle className="text-lg font-bold">Personal Profile</CardTitle>
+              <CardDescription className="font-medium">Maintain your contact information for account security and communications.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-6" id="profile-form">
-                {/* Avatar */}
-                <div className="flex items-center gap-6">
-                  <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                    RK
+            <CardContent className="pt-8">
+              <div className="space-y-10" id="profile-form">
+                <div className="flex flex-col sm:flex-row items-center gap-8">
+                  <div className="h-24 w-24 shrink-0 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white text-3xl font-black shadow-2xl shadow-blue-500/20 ring-4 ring-background">RK</div>
+                  <div className="space-y-3 text-center sm:text-left">
+                    <div className="flex gap-2">
+                       <Button variant="outline" size="sm" onClick={() => toast.info('Image upload is currently disabled')}><Upload className="h-4 w-4 mr-2" />Upload New Photo</Button>
+                       <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/5 font-bold">Remove</Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-widest">Recommended: Square JPG/PNG, min 400x400px</p>
                   </div>
-                  <div>
-                    <Button variant="outline" size="sm">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Change Photo
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  <div className="space-y-2"><Label htmlFor="first-name" className="text-xs font-black uppercase tracking-widest text-muted-foreground">First Name</Label><Input id="first-name" defaultValue="Rajesh" className="bg-muted/20 border-border/50 h-11" /></div>
+                  <div className="space-y-2"><Label htmlFor="last-name" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Last Name</Label><Input id="last-name" defaultValue="Kumar" className="bg-muted/20 border-border/50 h-11" /></div>
+                  <div className="space-y-2"><Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Primary Email</Label><Input id="email" type="email" defaultValue="rajesh.kumar@email.com" className="bg-muted/20 border-border/50 h-11" /></div>
+                  <div className="space-y-2"><Label htmlFor="phone" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Phone Number</Label><Input id="phone" type="tel" defaultValue="+91 98765 43210" className="bg-muted/20 border-border/50 h-11" /></div>
+                  <div className="space-y-2 md:col-span-2"><Label htmlFor="address" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Permanent Address</Label><Textarea id="address" defaultValue="42, 3rd Cross, HSR Layout, Sector 7, Bangalore - 560102, Karnataka" className="bg-muted/20 border-border/50 min-h-[100px] resize-none" /></div>
+                </div>
+
+                <div className="pt-4 flex items-center justify-between border-t border-border/20">
+                  <p className="text-xs text-muted-foreground font-medium italic">Last updated: 11 Mar 2026, 09:12 AM</p>
+                  <div className="flex gap-3">
+                    <Button id="save-profile" size="lg" className="px-8 font-bold" onClick={() => handleSave('Profile')} disabled={isSaving}>
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                      Save Changes
                     </Button>
-                    <p className="text-xs text-gray-400 mt-2">JPG, PNG or GIF. Max size 2MB</p>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="first-name">First Name</label>
-                    <Input id="first-name" defaultValue="Rajesh" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="last-name">Last Name</label>
-                    <Input id="last-name" defaultValue="Kumar" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="email">Email Address</label>
-                    <Input id="email" type="email" defaultValue="rajesh.kumar@email.com" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="phone">Phone Number</label>
-                    <Input id="phone" type="tel" defaultValue="+91 98765 43210" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="dob">Date of Birth</label>
-                    <Input id="dob" type="date" defaultValue="1990-05-15" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="pan">PAN Number</label>
-                    <Input id="pan" defaultValue="ABCPK1234Z" disabled />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="address">Address</label>
-                    <textarea
-                      id="address"
-                      className="flex min-h-[80px] w-full rounded-lg border border-input bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 transition-all duration-200"
-                      defaultValue="42, 3rd Cross, HSR Layout, Sector 7, Bangalore - 560102, Karnataka"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="city">City</label>
-                    <Input id="city" defaultValue="Bangalore" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="pincode">PIN Code</label>
-                    <Input id="pincode" defaultValue="560102" />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-4 border-t border-border">
-                  <Button id="save-profile">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </Button>
-                  <Button variant="outline">Cancel</Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Security Tab */}
-        <TabsContent value="security">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Change Password</CardTitle>
-                <CardDescription>Ensure your account uses a strong, unique password</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-w-md" id="security-form">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="current-password">Current Password</label>
-                    <div className="relative">
-                      <Input id="current-password" type={showPassword ? 'text' : 'password'} placeholder="Enter current password" />
-                      <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer" onClick={() => setShowPassword(!showPassword)}>
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
+        {/* ─── Security ─── */}
+        <TabsContent value="security" className="space-y-6">
+          <Card className="border-border/50">
+            <CardHeader className="pb-6 border-b border-border/20">
+              <CardTitle className="text-lg font-bold">Account Protection</CardTitle>
+              <CardDescription className="font-medium">Maintain a high security level by updating your password regularly.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-8">
+              <div className="max-w-md space-y-6" id="security-form">
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <div className="relative">
+                    <Input id="current-password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="bg-muted/20 border-border/50 h-11 pr-12" />
+                    <button className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors" onClick={() => setShowPassword(!showPassword)}>
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="new-password">New Password</label>
-                    <Input id="new-password" type="password" placeholder="Enter new password" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700" htmlFor="confirm-password">Confirm New Password</label>
-                    <Input id="confirm-password" type="password" placeholder="Confirm new password" />
-                  </div>
-                  <Button id="update-password">Update Password</Button>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="space-y-2"><Label htmlFor="new-password">New Password</Label><Input id="new-password" type="password" placeholder="Min 12 characters" className="bg-muted/20 border-border/50 h-11" /></div>
+                <div className="space-y-2"><Label htmlFor="confirm-password">Confirm Password</Label><Input id="confirm-password" type="password" placeholder="Repeat new password" className="bg-muted/20 border-border/50 h-11" /></div>
+                <Button id="update-password" size="lg" className="w-full font-bold" onClick={() => handleSave('Password')} disabled={isSaving}>
+                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Update Account Security'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Two-Factor Authentication</CardTitle>
-                <CardDescription>Add an extra layer of security to your account</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4" id="2fa-settings">
-                  <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-                    <div>
-                      <p className="font-medium text-gray-800">SMS OTP</p>
-                      <p className="text-sm text-gray-500">Receive OTP via SMS for login</p>
+          <Card className="border-border/50">
+            <CardHeader className="pb-6 border-b border-border/20">
+              <CardTitle className="text-lg font-bold">Verified Devices</CardTitle>
+              <CardDescription className="font-medium">Manage hardware authorized to access this secure portal.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="space-y-4" id="verified-devices">
+                {[
+                  { name: 'iPhone 15 Pro', type: 'Primary Device', active: 'Current Session', icon: Smartphone, color: 'text-blue-500' },
+                  { name: 'MacBook Pro 14"', type: 'Desktop Browser', active: '2 hours ago', icon: Laptop, color: 'text-slate-500' },
+                ].map((device, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-muted/5 group">
+                    <div className="flex items-center gap-4">
+                       <div className={`h-10 w-10 rounded-full bg-background flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform ${device.color}`}>
+                          <device.icon className="h-5 w-5" />
+                       </div>
+                       <div>
+                          <p className="text-sm font-bold tracking-tight">{device.name}</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{device.type} • {device.active}</p>
+                       </div>
                     </div>
-                    <Badge variant="success">Enabled</Badge>
+                    <Button variant="ghost" size="sm" className="text-xs font-bold text-destructive hover:bg-destructive/5">Revoke</Button>
                   </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-                    <div>
-                      <p className="font-medium text-gray-800">Email OTP</p>
-                      <p className="text-sm text-gray-500">Receive OTP via email for transactions</p>
-                    </div>
-                    <Badge variant="success">Enabled</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-                    <div>
-                      <p className="font-medium text-gray-800">Authenticator App</p>
-                      <p className="text-sm text-gray-500">Use Google Authenticator or similar</p>
-                    </div>
-                    <Button variant="outline" size="sm">Enable</Button>
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-                    <div>
-                      <p className="font-medium text-gray-800">Biometric Login</p>
-                      <p className="text-sm text-gray-500">Use fingerprint or face recognition</p>
-                    </div>
-                    <Button variant="outline" size="sm">Setup</Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Login Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3" id="login-activity">
-                  {[
-                    { device: 'Chrome on Windows', location: 'Bangalore, India', time: 'Active now', current: true },
-                    { device: 'Mobile App on Android', location: 'Bangalore, India', time: '2 hours ago', current: false },
-                    { device: 'Firefox on macOS', location: 'Mumbai, India', time: '2 days ago', current: false },
-                  ].map((session, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{session.device}</p>
-                        <p className="text-xs text-gray-400">{session.location} • {session.time}</p>
-                      </div>
-                      {session.current ? (
-                        <Badge variant="success">Current</Badge>
-                      ) : (
-                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">Revoke</Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="advanced-security" className="border-border/50 bg-muted/5 rounded-xl px-4 overflow-hidden">
+               <AccordionTrigger className="hover:no-underline font-bold text-sm">Advanced Security Protocols</AccordionTrigger>
+               <AccordionContent className="space-y-4 pb-6">
+                  <div className="flex items-center justify-between">
+                     <div className="space-y-0.5">
+                        <p className="text-xs font-bold">Automatic Session Timeout</p>
+                        <p className="text-[10px] text-muted-foreground">Log out after 5 minutes of inactivity</p>
+                     </div>
+                     <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                     <div className="space-y-0.5">
+                        <p className="text-xs font-bold">Restrict Overseas Access</p>
+                        <p className="text-[10px] text-muted-foreground">Reject logins from outside home country</p>
+                     </div>
+                     <Switch />
+                  </div>
+               </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </TabsContent>
 
-        {/* Notifications Tab */}
+        {/* ─── Notifications ─── */}
         <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Choose what notifications you receive</CardDescription>
+          <Card className="border-border/50">
+            <CardHeader className="pb-6 border-b border-border/20">
+              <CardTitle className="text-lg font-bold">Channel Management</CardTitle>
+              <CardDescription className="font-medium">Direct how and where you receive critical account alerts.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <div className="space-y-4" id="notification-settings">
                 {[
-                  { label: 'Transaction Alerts', desc: 'Get notified for all debit/credit transactions', sms: true, email: true, push: true },
-                  { label: 'Login Alerts', desc: 'Alerts when your account is logged in', sms: true, email: true, push: false },
-                  { label: 'Bill Payment Reminders', desc: 'Reminders before bill due dates', sms: false, email: true, push: true },
-                  { label: 'Promotional Offers', desc: 'Offers and campaigns from SecureBank', sms: false, email: false, push: true },
-                  { label: 'Investment Updates', desc: 'Portfolio and NAV updates', sms: false, email: true, push: true },
-                  { label: 'EMI Reminders', desc: 'Reminders before EMI deduction dates', sms: true, email: true, push: true },
+                  { label: 'Money Transfers', desc: 'Alerts for all fund movement', sms: true, email: true },
+                  { label: 'Account Access', desc: 'Security alerts for login attempts', sms: true, email: true },
+                  { label: 'Bill Reminders', desc: 'Upcoming payment due dates', sms: false, email: true },
+                  { label: 'Product Offers', desc: 'Relevant banking recommendations', sms: false, email: false },
                 ].map((pref, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-gray-50 transition-colors">
-                    <div>
-                      <p className="font-medium text-gray-800">{pref.label}</p>
-                      <p className="text-sm text-gray-500">{pref.desc}</p>
+                  <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border/50 p-5 hover:border-primary/20 transition-colors">
+                    <div className="max-w-md">
+                      <p className="text-sm font-bold tracking-tight">{pref.label}</p>
+                      <p className="text-xs text-muted-foreground mt-1 font-medium">{pref.desc}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" defaultChecked={pref.sms} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                        <span className="text-xs text-gray-500">SMS</span>
-                      </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" defaultChecked={pref.email} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                        <span className="text-xs text-gray-500">Email</span>
-                      </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" defaultChecked={pref.push} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                        <span className="text-xs text-gray-500">Push</span>
-                      </label>
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2"><Switch defaultChecked={pref.sms} onCheckedChange={(v) => toast.info('SMS alerts ' + (v ? 'on' : 'off'))} /><span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">SMS</span></div>
+                      <div className="flex items-center gap-2"><Switch defaultChecked={pref.email} onCheckedChange={(v) => toast.info('Email alerts ' + (v ? 'on' : 'off'))} /><span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Email</span></div>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="pt-4 mt-4 border-t border-border">
-                <Button id="save-notifications">Save Preferences</Button>
+              <div className="mt-8 pt-6 border-t border-border/20 flex justify-end">
+                <Button id="save-notifications" size="lg" className="px-10 font-bold" onClick={() => handleSave('Preferences')} disabled={isSaving}>Save Preferences</Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Limits Tab */}
+        {/* ─── Limits ─── */}
         <TabsContent value="limits">
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction Limits</CardTitle>
-              <CardDescription>Configure daily and per-transaction limits</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6" id="limits-form">
-                {[
-                  { label: 'IMPS Daily Limit', current: '₹5,00,000', fieldId: 'imps-limit' },
-                  { label: 'NEFT Daily Limit', current: '₹10,00,000', fieldId: 'neft-limit' },
-                  { label: 'RTGS Daily Limit', current: '₹25,00,000', fieldId: 'rtgs-limit' },
-                  { label: 'UPI Daily Limit', current: '₹1,00,000', fieldId: 'upi-limit' },
-                  { label: 'Card Online Transaction Limit', current: '₹50,000', fieldId: 'card-online-limit' },
-                  { label: 'ATM Withdrawal Limit', current: '₹50,000', fieldId: 'atm-limit' },
-                ].map((limit) => (
-                  <div key={limit.fieldId} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end p-4 rounded-lg border border-border">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">{limit.label}</p>
-                      <p className="text-xs text-gray-400 mt-1">Current: {limit.current}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-gray-500" htmlFor={limit.fieldId}>New Limit</label>
-                      <Input id={limit.fieldId} type="number" placeholder="Enter new limit" />
-                    </div>
-                    <Button variant="outline" size="sm" className="w-fit">Update</Button>
+          <Card className="border-border/50">
+            <CardHeader className="pb-6 border-b border-border/20">
+               <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-bold">Velocity Constraints</CardTitle>
+                    <CardDescription className="font-medium">Define your comfort levels for digital transactions.</CardDescription>
                   </div>
-                ))}
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <p className="text-sm text-amber-800 font-medium">⚠️ Limit changes require OTP verification and will take effect within 24 hours.</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-xs">Lower limits provide better protection against large unauthorized transactions.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+               </div>
+            </CardHeader>
+            <CardContent className="pt-8">
+              <div className="space-y-12" id="limits-form">
+                <div className="space-y-8 p-6 rounded-2xl border border-border/50 bg-muted/5">
+                   <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                         <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600"><Smartphone className="h-4 w-4" /></div>
+                         <Label className="text-sm font-bold">Daily UPI Velocity</Label>
+                      </div>
+                      <span className="text-sm font-black text-blue-600 bg-blue-500/10 px-3 py-1 rounded-full">₹{upiLimit[0].toLocaleString()}</span>
+                   </div>
+                   <Slider value={upiLimit} onValueChange={setUpiLimit} max={200000} step={5000} className="w-full" />
+                   <div className="flex justify-between text-[10px] uppercase font-black tracking-widest text-muted-foreground">
+                      <span>Min: ₹0</span>
+                      <span>Max Exposure: ₹2,00,000</span>
+                   </div>
                 </div>
+
+                <div className="space-y-8 p-6 rounded-2xl border border-border/50 bg-muted/5">
+                   <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                         <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600"><History className="h-4 w-4" /></div>
+                         <Label className="text-sm font-bold">Ecommerce / POS Cap</Label>
+                      </div>
+                      <span className="text-sm font-black text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full">₹{posLimit[0].toLocaleString()}</span>
+                   </div>
+                   <Slider value={posLimit} onValueChange={setPosLimit} max={100000} step={1000} className="w-full" />
+                </div>
+
+                <div className="space-y-8 p-6 rounded-2xl border border-border/50 bg-muted/5">
+                   <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                         <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-600"><ShieldCheck className="h-4 w-4" /></div>
+                         <Label className="text-sm font-bold">Net Banking Transfer Limit</Label>
+                      </div>
+                      <span className="text-sm font-black text-purple-600 bg-purple-500/10 px-3 py-1 rounded-full">₹{onlineLimit[0].toLocaleString()}</span>
+                   </div>
+                   <Slider value={onlineLimit} onValueChange={setOnlineLimit} max={500000} step={10000} className="w-full" />
+                </div>
+
+                <div className="flex justify-end pt-4">
+                   <Button size="lg" className="px-12 font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20" onClick={() => handleSave('Velocity Limits')}>Deploy Upgraded Limits</Button>
+                </div>
+
+                <Alert className="mt-8 bg-blue-500/5 border-blue-500/20">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <AlertTitle className="text-blue-700 font-bold">Protocol Information</AlertTitle>
+                  <AlertDescription className="text-blue-600/80 font-medium">Limit upgrades require an additional multi-factor authentication and are typically processed within 24 standard business hours.</AlertDescription>
+                </Alert>
               </div>
             </CardContent>
           </Card>

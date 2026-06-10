@@ -1,5 +1,6 @@
 import { Bell, AlertTriangle, CheckCircle, Info, X } from 'lucide-react'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 const initialNotifications = [
   { id: 1, type: 'success', title: 'Transfer Successful', message: '₹25,000 transferred to Priya Sharma', time: '2 min ago', read: false },
@@ -10,10 +11,10 @@ const initialNotifications = [
 ]
 
 const typeConfig = {
-  success: { icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-  warning: { icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50' },
-  info: { icon: Info, color: 'text-blue-500', bg: 'bg-blue-50' },
-  alert: { icon: Bell, color: 'text-red-500', bg: 'bg-red-50' },
+  success: { icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+  warning: { icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+  info: { icon: Info, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+  alert: { icon: Bell, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-500/10' },
 }
 
 export default function NotificationPanel() {
@@ -31,23 +32,23 @@ export default function NotificationPanel() {
         return (
           <div
             key={notification.id}
-            className={`flex items-start gap-3 p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${
-              notification.read ? 'bg-white border-gray-100' : 'bg-blue-50/30 border-blue-100'
+            className={`flex items-start gap-4 p-3 rounded-lg border transition-all duration-200 hover:shadow-sm ${
+              notification.read ? 'bg-card border-border' : 'bg-primary/5 border-primary/20'
             }`}
           >
-            <div className={`flex h-8 w-8 items-center justify-center rounded-full ${config.bg} flex-shrink-0 mt-0.5`}>
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${config.bg} flex-shrink-0 mt-0.5`}>
               <Icon className={`h-4 w-4 ${config.color}`} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-semibold ${notification.read ? 'text-gray-600' : 'text-gray-900'}`}>
+              <p className={`text-sm font-semibold ${notification.read ? 'text-foreground/70' : 'text-foreground'}`}>
                 {notification.title}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notification.message}</p>
-              <p className="text-[11px] text-gray-400 mt-1">{notification.time}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notification.message}</p>
+              <p className="text-[11px] text-muted-foreground/60 mt-2">{notification.time}</p>
             </div>
             <button
               onClick={() => dismissNotification(notification.id)}
-              className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 cursor-pointer"
+              className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 cursor-pointer p-1"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -55,9 +56,9 @@ export default function NotificationPanel() {
         )
       })}
       {notifications.length === 0 && (
-        <div className="text-center py-8 text-gray-400">
-          <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No notifications</p>
+        <div className="text-center py-10 text-muted-foreground">
+          <Bell className="h-10 w-10 mx-auto mb-3 opacity-20" />
+          <p className="text-sm">No new notifications</p>
         </div>
       )}
     </div>
