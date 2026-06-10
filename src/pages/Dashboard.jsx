@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wallet, ArrowLeftRight, CreditCard, PiggyBank, SendHorizontal, Receipt, QrCode, Plus, Camera, Loader2, Search, Bell, Settings, LogOut, LayoutDashboard, Landmark, Users, TrendingUp, Info } from 'lucide-react'
+import { Wallet, ArrowLeftRight, CreditCard, PiggyBank, SendHorizontal, Receipt, QrCode, Plus, Camera, Loader2, Search, Bell, Settings, LogOut, LayoutDashboard, Landmark, Users, TrendingUp, Info, Clock } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -111,6 +111,38 @@ export default function Dashboard() {
            </TooltipProvider>
         </div>
       </div>
+
+      {/* Credit Limit Pending Request Alert Banner */}
+      {(() => {
+        // Read pending requests written by CreditLimitIncrease page (localStorage)
+        const pending = JSON.parse(localStorage.getItem('clr_pending_requests') || '[]')
+        if (!pending.length) return null
+        return (
+          <div
+            id="dashboard-clr-banner"
+            className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 px-4 py-3"
+          >
+            <Clock className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Credit Limit Increase Pending
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 truncate">
+                Request {pending[0].id} — {pending[0].cardMasked} · Submitted {new Date(pending[0].requestDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 flex-shrink-0"
+              onClick={() => navigate('/credit-limit')}
+              id="btn-dashboard-view-clr"
+            >
+              View Status
+            </Button>
+          </div>
+        )
+      })()}
 
       {/* Welcome Banner */}
       <div className="rounded-2xl bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 px-8 py-8 text-white shadow-2xl shadow-blue-500/20 relative overflow-hidden">

@@ -9,6 +9,7 @@ import Transfer from './pages/Transfer'
 import BillPayments from './pages/BillPayments'
 import Beneficiaries from './pages/Beneficiaries'
 import Cards from './pages/Cards'
+import CreditLimitIncrease from './pages/CreditLimitIncrease'
 import Loans from './pages/Loans'
 import Investments from './pages/Investments'
 import Settings from './pages/Settings'
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/bill-payments" element={<BillPayments />} />
             <Route path="/beneficiaries" element={<Beneficiaries />} />
             <Route path="/cards" element={<Cards />} />
+            <Route path="/credit-limit" element={<CreditLimitIncrease />} />
             <Route path="/loans" element={<Loans />} />
             <Route path="/investments" element={<Investments />} />
             <Route path="/settings" element={<Settings />} />

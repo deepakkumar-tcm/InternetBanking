@@ -1,7 +1,7 @@
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Landmark, ArrowLeftRight, SendHorizontal, Receipt,
-  Users, CreditCard, Building2, TrendingUp, HelpCircle, Settings, Shield, LogOut,
+  Users, CreditCard, Building2, TrendingUp, HelpCircle, Settings, Shield, LogOut, ArrowUpCircle,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 
@@ -13,6 +13,7 @@ const navItems = [
   { label: 'Bill Payments', path: '/bill-payments', icon: Receipt },
   { label: 'Beneficiaries', path: '/beneficiaries', icon: Users },
   { label: 'Cards', path: '/cards', icon: CreditCard },
+  { label: 'Credit Limit', path: '/credit-limit', icon: ArrowUpCircle, indent: true },
   { label: 'Loans', path: '/loans', icon: Building2 },
   { label: 'Investments', path: '/investments', icon: TrendingUp },
 ]
@@ -63,17 +64,19 @@ export default function Sidebar() {
             <Link
               key={item.path}
               to={item.path}
-              id={`nav-${item.path.replace('/', '')}`}
+              id={`nav-${item.path.replace(/\//g, '').replace(/-/g, '')}`}
               className={`
-                flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium
+                flex items-center gap-3 rounded-xl font-medium
                 transition-all duration-200 group relative
+                ${item.indent ? 'ml-5 px-3 py-2 text-[12px]' : 'px-4 py-2.5 text-[13px]'}
                 ${isActive
                   ? 'bg-blue-600/10 text-white border border-blue-500/20 shadow-lg shadow-blue-500/5'
                   : 'text-slate-400 hover:bg-white/5 hover:text-slate-100 border border-transparent'
                 }
               `}
             >
-              <Icon className={`h-[18px] w-[18px] transition-colors duration-200 ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
+              {item.indent && <span className="text-slate-600 text-[10px] leading-none">└</span>}
+              <Icon className={`transition-colors duration-200 ${item.indent ? 'h-[15px] w-[15px]' : 'h-[18px] w-[18px]'} ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
               <span>{item.label}</span>
               {isActive && (
                 <div className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
