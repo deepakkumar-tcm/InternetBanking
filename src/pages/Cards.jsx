@@ -17,8 +17,49 @@ import { Progress } from '@/components/ui/progress'
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { CreditCard, Lock, Unlock, Eye, EyeOff, Settings, Snowflake, Wifi, Loader2, CheckCircle2, Shield, Globe, ShoppingCart, Banknote, TrendingUp, Copy, Check } from 'lucide-react'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { CreditCard, Lock, Unlock, Eye, EyeOff, Settings, Snowflake, Wifi, Loader2, CheckCircle2, Shield, Globe, ShoppingCart, Banknote, TrendingUp, Copy, Check, ChevronDown, ArrowRight, XCircle, AlertTriangle, Fingerprint, BadgeCheck, Search, RotateCcw, Home } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatCurrency } from '@/lib/utils'
+
+// ── CLR constants & helpers ───────────────────────────────────────────────
+const CLR_MIN_SCORE   = 750
+const CLR_BANK_MAX    = 3000000
+const CLR_CHECKS = [
+  { id: 'card_status', icon: CreditCard,  label: 'Card & Account Status',   desc: 'Confirming active status' },
+  { id: 'utilization', icon: TrendingUp,  label: 'Credit Utilization',       desc: 'Max allowed: 80%' },
+  { id: 'kyc',         icon: BadgeCheck,  label: 'KYC Verification',         desc: 'Identity documents check' },
+  { id: 'fraud',       icon: Fingerprint, label: 'Fraud Risk Assessment',    desc: 'Device & velocity checks' },
+  { id: 'aml',         icon: Search,      label: 'AML & Sanctions',          desc: 'Anti-money laundering' },
+]
+const CLR_CUSTOMER = { creditScore: 720, utilizationRatio: 45, kycStatus: 'Verified', amlStatus: 'Clear', riskLevel: 'LOW', fraudRiskScore: 18 }
+
+function clrEvaluate(checkId, card) {
+  if (checkId === 'card_status') {
+    if (card.frozen) return { status: 'fail', message: 'Card is currently frozen. Unfreeze before requesting.' }
+    return { status: 'pass', message: 'Card: Active · Account: Active' }
+  }
+  if (checkId === 'utilization') {
+    if (CLR_CUSTOMER.utilizationRatio > 80) return { status: 'fail', message: `Utilization ${CLR_CUSTOMER.utilizationRatio}% exceeds 80% limit.` }
+    return { status: 'pass', message: `Utilization: ${CLR_CUSTOMER.utilizationRatio}% — Within limit` }
+  }
+  if (checkId === 'kyc') {
+    if (CLR_CUSTOMER.kycStatus !== 'Verified') return { status: 'fail', message: 'KYC must be completed first.' }
+    return { status: 'pass', message: 'KYC: Verified' }
+  }
+  if (checkId === 'fraud') {
+    if (CLR_CUSTOMER.riskLevel === 'HIGH') return { status: 'fail', message: 'Request blocked due to security concerns.' }
+    if (CLR_CUSTOMER.riskLevel === 'MEDIUM') return { status: 'warn', message: 'OTP verification required.' }
+    return { status: 'pass', message: `Risk score: ${CLR_CUSTOMER.fraudRiskScore}/100 — LOW` }
+  }
+  if (checkId === 'aml') {
+    if (CLR_CUSTOMER.amlStatus !== 'Clear') return { status: 'fail', message: 'AML check failed.' }
+    return { status: 'pass', message: 'AML: Clear · No sanctions' }
+  }
+  return { status: 'pass', message: 'Passed' }
+}
+
+const clrFmt = (n) => (typeof n === 'number' && isFinite(n) ? n : 0).toLocaleString('en-IN')
 
 // ── Full card data (full numbers & CVVs for reveal feature) ───────────────
 const initialCards = [
@@ -210,6 +251,91 @@ export default function Cards() {
     toast.success('Feature updated for card')
   }
 
+  // ── Credit Limit Increase wizard (embedded) ────────────────────────────
+  // steps: 1=card select, 2=slider, 3=checks, 4=otp, 5=success, 'ineligible'
+  const creditCards = initialCards.filter(c => c.type === 'Credit Card')
+
+  const [clrOpen, setClrOpen]                   = useState(false)
+  const [clrStep, setClrStep]                   = useState(1)
+  const [clrCardId, setClrCardId]               = useState('')
+  const [clrDesired, setClrDesired]             = useState(0)
+  const [clrLimitInput, setClrLimitInput]       = useState('')
+  const [clrLimitError, setClrLimitError]       = useState('')
+  const [clrCheckIdx, setClrCheckIdx]           = useState(-1)
+  const [clrCheckResults, setClrCheckResults]   = useState({})
+  const [clrDone, setClrDone]                   = useState(false)
+  const [clrResult, setClrResult]               = useState(null)   // 'pass'|'fail'|'otp_required'
+  const [clrOtp, setClrOtp]                     = useState('')
+  const [clrOtpBusy, setClrOtpBusy]             = useState(false)
+  const [clrSRN, setClrSRN]                     = useState('')
+
+  const clrCard = creditCards.find(c => c.id === Number(clrCardId))
+  const clrMax  = CLR_BANK_MAX
+
+  const openClr = () => {
+    setClrOpen(true); setClrStep(1); setClrCardId(''); setClrDesired(0)
+    setClrLimitInput(''); setClrLimitError(''); setClrCheckIdx(-1)
+    setClrCheckResults({}); setClrDone(false); setClrResult(null)
+    setClrOtp(''); setClrOtpBusy(false); setClrSRN('')
+  }
+  const closeClr = () => setClrOpen(false)
+
+  const clrSelectCard = (id) => {
+    setClrCardId(id)
+    const c = creditCards.find(x => x.id === Number(id))
+    if (c) { setClrDesired(c.limit); setClrLimitInput(String(c.limit)) }
+  }
+
+  const clrProceedCard = () => {
+    if (!clrCardId) { toast.error('Please select a credit card.'); return }
+    const c = creditCards.find(x => x.id === Number(clrCardId))
+    if (c) { setClrDesired(c.limit); setClrLimitInput(String(c.limit)) }
+    setClrStep(2)
+  }
+
+  const clrProceedLimit = () => {
+    if (!clrDesired || clrDesired <= (clrCard?.limit ?? 0)) {
+      setClrLimitError('Please select a limit higher than your current limit.'); return
+    }
+    if (clrDesired > clrMax) { setClrLimitError(`Max allowed: ${formatCurrency(clrMax)}.`); return }
+    setClrLimitError('')
+    if (CLR_CUSTOMER.creditScore < CLR_MIN_SCORE) {
+      setClrSRN(`SR${Date.now().toString().slice(-9)}`); setClrStep('ineligible'); return
+    }
+    const card = clrCard
+    setClrStep(3)
+    setTimeout(() => clrRunChecks(card), 120)
+  }
+
+  const clrRunChecks = async (card) => {
+    const results = {}
+    for (let i = 0; i < CLR_CHECKS.length; i++) {
+      setClrCheckIdx(i)
+      await new Promise(r => setTimeout(r, 480 + Math.random() * 380))
+      const res = clrEvaluate(CLR_CHECKS[i].id, card)
+      results[CLR_CHECKS[i].id] = res
+      setClrCheckResults(prev => ({ ...prev, [CLR_CHECKS[i].id]: res }))
+      if (res.status === 'fail') { setClrDone(true); setClrResult('fail'); return }
+    }
+    setClrCheckIdx(CLR_CHECKS.length); setClrDone(true)
+    setClrResult(Object.values(results).some(r => r.status === 'warn') ? 'otp_required' : 'pass')
+  }
+
+  const clrNextFromChecks = () => {
+    if (clrResult === 'pass')         { setClrStep(5) }
+    else if (clrResult === 'otp_required') { setClrStep(4) }
+    else                              { setClrStep(5) }
+  }
+
+  const clrVerifyOtp = () => {
+    if (clrOtp.length !== 6) { toast.error('Enter a 6-digit OTP.'); return }
+    setClrOtpBusy(true)
+    setTimeout(() => { setClrOtpBusy(false); setClrStep(5) }, 1500)
+  }
+
+  const clrProgressPct = clrCheckIdx < 0
+    ? 0 : Math.round((Math.min(clrCheckIdx + 1, CLR_CHECKS.length) / CLR_CHECKS.length) * 100)
+
   // ════════════════════════════════════════════════════════════════════════
   return (
     <div className="space-y-8 animate-fade-in" id="cards-page">
@@ -220,9 +346,23 @@ export default function Cards() {
           <h2 className="text-2xl font-bold tracking-tight">My Cards</h2>
           <p className="text-sm text-muted-foreground">Swipe through cards, adjust limits, and manage settings</p>
         </div>
-        <Button onClick={() => setApplyCardOpen(true)} id="btn-apply-card">
-          <CreditCard className="h-4 w-4 mr-2" />Apply for New Card
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button id="btn-services">
+              Services <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => setApplyCardOpen(true)} id="menu-apply-card">
+              <CreditCard className="h-4 w-4 mr-2 text-muted-foreground" />
+              Apply for New Card
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={openClr} id="menu-credit-limit">
+              <TrendingUp className="h-4 w-4 mr-2 text-muted-foreground" />
+              Credit Limit Increase
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* ── Card Carousel ───────────────────────────────────────────────── */}
@@ -796,6 +936,333 @@ export default function Cards() {
               <Button id="btn-done-apply-card" onClick={closeApplyDialog} className="mt-2">Done</Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          CREDIT LIMIT INCREASE WIZARD DIALOG
+      ══════════════════════════════════════════════════════════════════ */}
+      <Dialog open={clrOpen} onOpenChange={closeClr}>
+        <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-y-auto p-0" id="clr-dialog">
+
+          {/* ── Step 1: Select card ──────────────────────────────────────── */}
+          {clrStep === 1 && (
+            <>
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-t-xl p-6 text-white">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-lg leading-none">Credit Limit Increase</p>
+                    <p className="text-blue-200 text-xs mt-0.5">Select the credit card to upgrade</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  {[
+                    { label: 'Your Score',     value: CLR_CUSTOMER.creditScore, flag: true },
+                    { label: 'Bank Max Limit', value: '₹30L' },
+                  ].map(s => (
+                    <div key={s.label} className="bg-white/10 rounded-xl py-2 px-1">
+                      <p className={`text-base font-black ${s.flag ? (CLR_CUSTOMER.creditScore >= CLR_MIN_SCORE ? 'text-emerald-300' : 'text-red-300') : 'text-white'}`}>{s.value}</p>
+                      <p className="text-[10px] text-blue-200 mt-0.5 leading-tight">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-widest">Select Credit Card</Label>
+                  <Select value={clrCardId} onValueChange={clrSelectCard}>
+                    <SelectTrigger id="clr-sel-card"><SelectValue placeholder="Choose a credit card" /></SelectTrigger>
+                    <SelectContent>
+                      {creditCards.map(c => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>{c.name}</span>
+                            <span className="font-mono text-xs text-muted-foreground">{c.number}</span>
+                            {cardStates[c.id] && <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-600 border-amber-200">Frozen</Badge>}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {clrCard && (
+                  <div className={`rounded-xl bg-gradient-to-br ${clrCard.color} p-4 text-white`}>
+                    <p className="text-[10px] text-white/60 uppercase tracking-widest">{clrCard.brand} · {clrCard.type}</p>
+                    <p className="font-bold text-sm mt-0.5 mb-2">{clrCard.name}</p>
+                    <p className="font-mono tracking-[.2em] text-sm mb-3">{clrCard.number}</p>
+                    <div className="flex justify-between text-xs">
+                      <div>
+                        <p className="text-white/60 text-[10px] uppercase tracking-widest">Current Limit</p>
+                        <p className="font-bold text-base mt-0.5">₹{clrFmt(clrCard.limit)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/60 text-[10px] uppercase tracking-widest">Available</p>
+                        <p className="font-bold mt-0.5">₹{clrFmt(clrCard.limit - clrCard.used)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/60 text-[10px] uppercase tracking-widest">Expires</p>
+                        <p className="font-bold mt-0.5">{clrCard.expiry}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-1">
+                  <Button variant="outline" onClick={closeClr} className="flex-1">Cancel</Button>
+                  <Button onClick={clrProceedCard} className="flex-1" id="clr-btn-proceed-1">
+                    Proceed <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── Step 2: Desired limit slider ─────────────────────────────── */}
+          {clrStep === 2 && clrCard && (
+            <>
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 rounded-t-xl p-5 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="rounded-lg bg-white dark:bg-gray-900 border px-3 py-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Current Card</p>
+                    <p className="text-sm font-black">{clrCard.name.replace('SecureBank ', '')}</p>
+                  </div>
+                  <div className="rounded-lg bg-white dark:bg-gray-900 border px-3 py-2 text-right">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Current Limit</p>
+                    <p className="text-sm font-black text-blue-600">₹{clrFmt(clrCard.limit)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-semibold text-muted-foreground">Please select your desired Credit Limit</p>
+                  <p className="text-4xl font-black tracking-tight">₹{clrFmt(Math.max(clrDesired, clrCard.limit))}</p>
+                  {clrDesired > clrCard.limit && (
+                    <p className="text-xs font-semibold text-emerald-600">
+                      +₹{clrFmt(clrDesired - clrCard.limit)} increase
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Slider
+                    min={clrCard.limit} max={clrMax} step={10000}
+                    value={[Math.min(Math.max(clrDesired, clrCard.limit), clrMax)]}
+                    onValueChange={v => {
+                      const val = Array.isArray(v) ? v[0] : (typeof v === 'number' ? v : clrCard.limit)
+                      if (typeof val !== 'number' || val < clrCard.limit) return
+                      setClrDesired(val)
+                      setClrLimitInput(String(val))
+                      setClrLimitError('')
+                    }}
+                    id="clr-slider"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground font-medium">
+                    <span>Current ₹{clrFmt(clrCard.limit)}</span>
+                    <span>Max ₹{clrFmt(clrMax)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold uppercase tracking-widest">Enter Desired Limit</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-semibold">₹</span>
+                    <Input
+                      className={`pl-7 text-sm font-semibold ${clrLimitError ? 'border-red-500' : ''}`}
+                      value={clrLimitInput ? Number(clrLimitInput).toLocaleString('en-IN') : ''}
+                      onChange={e => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '')
+                        setClrLimitInput(raw)
+                        const num = parseInt(raw, 10)
+                        if (!isNaN(num) && clrCard) {
+                          setClrDesired(Math.min(Math.max(num, clrCard.limit), clrMax))
+                        }
+                        setClrLimitError('')
+                      }}
+                      placeholder="e.g. 7,00,000"
+                      id="clr-limit-input"
+                    />
+                  </div>
+                  {clrLimitError && <p className="text-xs text-red-500">{clrLimitError}</p>}
+                </div>
+
+                <div className="rounded-xl bg-muted/50 border p-3 flex items-start gap-2.5">
+                  <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Credit Limit Increase is subject to SecureBank's internal policies. Min credit score required: <strong>{CLR_MIN_SCORE}</strong>.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={() => { setClrDesired(clrCard.limit); setClrLimitInput(String(clrCard.limit)); setClrLimitError('') }} className="flex-1">
+                    <RotateCcw className="h-4 w-4 mr-2" />Reset
+                  </Button>
+                  <Button onClick={clrProceedLimit} className="flex-1" id="clr-btn-proceed-2">
+                    Proceed <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── Ineligible ───────────────────────────────────────────────── */}
+          {clrStep === 'ineligible' && (
+            <div className="p-8 text-center space-y-5" id="clr-ineligible">
+              <div className="h-20 w-20 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center mx-auto">
+                <XCircle className="h-10 w-10 text-red-600" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black">Sorry!</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
+                  Basis our internal assessment, you are currently not eligible for a Credit Limit Increase.
+                </p>
+                <p className="text-sm text-muted-foreground">We regret the inconvenience caused.</p>
+              </div>
+              <div className="rounded-xl bg-muted/50 border p-4 text-sm space-y-2 text-left max-w-xs mx-auto">
+                <div className="flex justify-between"><span className="text-muted-foreground">Your Score</span><span className="font-bold text-red-600">{CLR_CUSTOMER.creditScore}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Min Required</span><span className="font-bold">{CLR_MIN_SCORE}</span></div>
+                <Separator />
+                <div className="flex justify-between"><span className="text-muted-foreground text-xs">Shortfall</span><span className="text-xs font-bold text-amber-600">{CLR_MIN_SCORE - CLR_CUSTOMER.creditScore} points</span></div>
+              </div>
+              <div className="border rounded-xl p-4 bg-background max-w-xs mx-auto">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-1">Service Request Number</p>
+                <p className="font-mono text-sm font-bold text-primary">{clrSRN}</p>
+              </div>
+              <Button onClick={closeClr} className="w-full max-w-xs mx-auto flex gap-2" id="clr-btn-close-ineligible">
+                <Home className="h-4 w-4" />Close
+              </Button>
+            </div>
+          )}
+
+          {/* ── Step 3: Compliance checks ────────────────────────────────── */}
+          {clrStep === 3 && (
+            <div className="p-6 space-y-4" id="clr-checks">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">
+                  {!clrDone ? 'Processing your request…'
+                    : clrResult === 'fail' ? 'Could Not Be Processed'
+                    : clrResult === 'otp_required' ? 'Verification Required'
+                    : 'All Checks Passed ✓'}
+                </DialogTitle>
+                <DialogDescription>{!clrDone ? 'Please wait while we verify your eligibility.' : ''}</DialogDescription>
+              </DialogHeader>
+              <Progress value={clrProgressPct} className="h-2" />
+              <p className="text-xs text-muted-foreground text-right">{clrProgressPct}% complete</p>
+              <div className="space-y-1.5">
+                {CLR_CHECKS.map((chk, i) => {
+                  const res      = clrCheckResults[chk.id]
+                  const isActive = clrCheckIdx === i && !res
+                  const Icon     = chk.icon
+                  let statusIcon = <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/25" />
+                  if (isActive)              statusIcon = <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  else if (res?.status === 'pass') statusIcon = <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  else if (res?.status === 'warn') statusIcon = <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  else if (res?.status === 'fail') statusIcon = <XCircle className="h-4 w-4 text-red-500" />
+                  return (
+                    <div key={chk.id} className={`flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors
+                      ${isActive ? 'bg-blue-50 dark:bg-blue-950/30 border border-blue-200'
+                      : res?.status === 'fail' ? 'bg-red-50 dark:bg-red-950/30 border border-red-200'
+                      : res?.status === 'warn' ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200'
+                      : res?.status === 'pass' ? 'bg-muted/30' : ''}`}>
+                      <div className="h-7 w-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-blue-500' : res?.status === 'pass' ? 'text-emerald-500' : res?.status === 'warn' ? 'text-amber-500' : res?.status === 'fail' ? 'text-red-500' : 'text-muted-foreground/40'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold leading-none mb-0.5 ${res?.status === 'fail' ? 'text-red-600' : res?.status === 'warn' ? 'text-amber-700' : 'text-foreground'}`}>{chk.label}</p>
+                        <p className="text-xs text-muted-foreground">{res ? res.message : isActive ? 'Checking…' : chk.desc}</p>
+                      </div>
+                      <div className="flex-shrink-0 mt-0.5">{statusIcon}</div>
+                    </div>
+                  )
+                })}
+              </div>
+              {clrDone && (
+                <div className="pt-1">
+                  {clrResult === 'fail'
+                    ? <Button variant="outline" onClick={closeClr} className="w-full">Close</Button>
+                    : <Button onClick={clrNextFromChecks} className={`w-full ${clrResult === 'pass' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}>
+                        {clrResult === 'otp_required' ? <>Verify OTP <ArrowRight className="h-4 w-4 ml-2" /></> : <>Confirm Request <ArrowRight className="h-4 w-4 ml-2" /></>}
+                      </Button>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Step 4: OTP ──────────────────────────────────────────────── */}
+          {clrStep === 4 && (
+            <div className="p-6 space-y-6" id="clr-otp">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">OTP Verification</DialogTitle>
+                <DialogDescription>Enter the 6-digit OTP sent to your registered mobile ••••7890.</DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col items-center gap-4 py-4">
+                <div className="h-14 w-14 rounded-2xl bg-amber-50 dark:bg-amber-950 flex items-center justify-center">
+                  <Shield className="h-7 w-7 text-amber-600" />
+                </div>
+                <InputOTP maxLength={6} value={clrOtp} onChange={setClrOtp} id="clr-otp-input">
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2} />
+                  </InputOTPGroup>
+                  <InputOTPSeparator />
+                  <InputOTPGroup>
+                    <InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+                <p className="text-xs text-muted-foreground">Enter any 6 digits for this demo</p>
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setClrStep(3)} className="flex-1">← Back</Button>
+                <Button onClick={clrVerifyOtp} disabled={clrOtpBusy} className="flex-1" id="clr-btn-verify-otp">
+                  {clrOtpBusy ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verifying…</> : <>Verify & Submit <ArrowRight className="h-4 w-4 ml-2" /></>}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 5: Success ──────────────────────────────────────────── */}
+          {clrStep === 5 && (
+            <div className="p-8 text-center space-y-5" id="clr-success">
+              <div className="h-20 w-20 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black">Request Submitted!</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Your credit limit increase request is under review. You will be notified within 2–3 business days.
+                </p>
+              </div>
+              {clrCard && (
+                <div className="rounded-xl bg-muted/50 border p-4 text-sm text-left space-y-2 max-w-xs mx-auto">
+                  {[
+                    ['Card',             clrCard.number],
+                    ['Current Limit',    `₹${clrFmt(clrCard.limit)}`],
+                    ['Requested Limit',  `₹${clrFmt(clrDesired)}`],
+                    ['Increase Amount',  `+₹${clrFmt(clrDesired - clrCard.limit)}`],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between items-center">
+                      <span className="text-muted-foreground">{k}</span>
+                      <span className="font-semibold">{v}</span>
+                    </div>
+                  ))}
+                  <Separator />
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Pending Review</Badge>
+                  </div>
+                </div>
+              )}
+              <Button onClick={closeClr} className="w-full max-w-xs mx-auto bg-emerald-600 hover:bg-emerald-700" id="clr-btn-done">
+                Done
+              </Button>
+            </div>
+          )}
+
         </DialogContent>
       </Dialog>
 

@@ -13,7 +13,6 @@ const navItems = [
   { label: 'Bill Payments', path: '/bill-payments', icon: Receipt },
   { label: 'Beneficiaries', path: '/beneficiaries', icon: Users },
   { label: 'Cards', path: '/cards', icon: CreditCard },
-  { label: 'Credit Limit', path: '/credit-limit', icon: ArrowUpCircle, indent: true },
   { label: 'Loans', path: '/loans', icon: Building2 },
   { label: 'Investments', path: '/investments', icon: TrendingUp },
 ]
