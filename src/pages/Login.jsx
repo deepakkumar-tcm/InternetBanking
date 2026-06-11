@@ -1,225 +1,307 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
-import { Shield, Loader2, KeyRound, UserPlus, Info, Fingerprint, Lock, ShieldCheck, Cpu } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp'
+import {
+  Shield, Loader2, KeyRound, User, Eye, EyeOff,
+  ShieldCheck, Copy, Check, RefreshCw, MessageSquare,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
+// ─── Demo credentials ────────────────────────────────────────────────────────
+const DEMO_USER = { id: 'CUST7821', password: 'SecurePass@123' }
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [showError, setShowError] = useState(false)
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
+  const [step, setStep]           = useState(1)   // 1 = credentials, 2 = OTP
+
+  // Step 1
+  const [userId, setUserId]       = useState('')
+  const [password, setPassword]   = useState('')
+  const [showPwd, setShowPwd]     = useState(false)
+  const [loginBusy, setLoginBusy] = useState(false)
+  const [loginError, setLoginError] = useState('')
+
+  // Step 2
+  const [otp, setOtp]             = useState('')
+  const [demoOtp, setDemoOtp]     = useState('')
+  const [otpBusy, setOtpBusy]     = useState(false)
+  const [copied, setCopied]       = useState(false)
+
+  // Forgot password dialog
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [forgotId, setForgotId]     = useState('')
 
   useEffect(() => {
-    // If already logged in, go to dashboard
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
-    if (isLoggedIn) {
-      navigate('/dashboard')
-    }
+    if (localStorage.getItem('isLoggedIn') === 'true') navigate('/dashboard')
   }, [navigate])
 
-  const handleSubmit = (e) => {
+  const handleLogin = (e) => {
     e.preventDefault()
-    setIsLoading(true)
-    setShowError(false)
-
-    // Simulate API delay
+    setLoginError('')
+    if (!userId.trim() || !password.trim()) { setLoginError('Please enter your Customer ID and Password.'); return }
+    setLoginBusy(true)
     setTimeout(() => {
-      // For demo, any email with 'error' shows an alert
-      if (email.includes('error')) {
-        setShowError(true)
-        setIsLoading(false)
-        toast.error('Authentication Failed', { description: 'Please check your credentials.' })
-        return
-      }
+      setLoginBusy(false)
+      const newOtp = generateOtp()
+      setDemoOtp(newOtp)
+      setOtp('')
+      setStep(2)
+    }, 1200)
+  }
 
+  const handleCopyOtp = () => {
+    navigator.clipboard.writeText(demoOtp).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleResendOtp = () => {
+    const newOtp = generateOtp()
+    setDemoOtp(newOtp)
+    setOtp('')
+    toast.success('New OTP generated.')
+  }
+
+  const handleVerifyOtp = () => {
+    if (otp.length !== 6) { toast.error('Please enter the 6-digit OTP.'); return }
+    setOtpBusy(true)
+    setTimeout(() => {
+      setOtpBusy(false)
       localStorage.setItem('isLoggedIn', 'true')
-      localStorage.setItem('userEmail', email)
-      toast.success('Access Granted', { description: 'Welcome back to the secure portal.' })
+      localStorage.setItem('userEmail', DEMO_USER.id)
+      toast.success('Login Successful', { description: 'Welcome back, Rajesh Kumar.' })
       navigate('/dashboard')
-      setIsLoading(false)
-    }, 1500)
+    }, 1000)
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden">
-      {/* Background Orbs for Premium Look */}
+    <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
+      {/* Background blobs */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-[420px] z-10 animate-in fade-in zoom-in duration-700">
-        {/* Logo Section */}
-        <div className="flex flex-col items-center gap-3 mb-10 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 shadow-2xl shadow-blue-500/30 ring-8 ring-blue-500/5 rotate-3 hover:rotate-0 transition-transform duration-500">
+      <div className="w-full max-w-[420px] z-10 space-y-8">
+
+        {/* Logo */}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 shadow-2xl shadow-blue-500/30">
             <Shield className="h-8 w-8 text-white" />
           </div>
-          <div className="space-y-1">
-            <h1 className="text-3xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase">Secure<span className="text-blue-600">Bank</span></h1>
-            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-extrabold uppercase tracking-[.4em]">Military Grade Gateway</p>
+          <div>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900">
+              Secure<span className="text-blue-600">Bank</span>
+            </h1>
+            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-[.35em] mt-1">Internet Banking</p>
           </div>
         </div>
 
-        <Card className="border-border/40 shadow-2xl shadow-slate-200/50 dark:shadow-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl overflow-hidden">
-          <CardHeader className="space-y-1 pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-bold">Portal Access</CardTitle>
-              <HoverCard>
-                 <HoverCardTrigger asChild>
-                    <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center cursor-help">
-                       <Info className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                 </HoverCardTrigger>
-                 <HoverCardContent className="w-80">
-                    <div className="flex space-x-4">
-                       <ShieldCheck className="h-10 w-10 text-emerald-500 mt-1" />
-                       <div className="space-y-1">
-                          <h4 className="text-sm font-bold uppercase tracking-widest">TLS 1.3 Encryption</h4>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                             This session is secured with AES-256-GCM. All inputs are sanitized and monitored by our real-time audit engine.
-                          </p>
-                       </div>
-                    </div>
-                 </HoverCardContent>
-              </HoverCard>
+        {/* ── STEP 1: Login form ─────────────────────────────────────────────── */}
+        {step === 1 && (
+          <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-border/40 overflow-hidden">
+            <div className="px-7 pt-7 pb-2">
+              <h2 className="text-xl font-bold text-slate-900">Welcome back</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Sign in to your account</p>
             </div>
-            <CardDescription className="font-medium">Digitally sign in to your encrypted financial hub</CardDescription>
-          </CardHeader>
-          
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-5">
-              {showError && (
-                 <Alert variant="destructive" className="animate-in slide-in-from-top-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Access Denied</AlertTitle>
-                    <AlertDescription>Protocol mismatch or invalid token signatures.</AlertDescription>
-                 </Alert>
+
+            <form onSubmit={handleLogin} className="px-7 pb-7 pt-4 space-y-5">
+              {loginError && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
+                  {loginError}
+                </div>
               )}
 
+              {/* Customer ID */}
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Identity Identifier</Label>
-                <div className="relative group">
-                   <Input
-                    id="email"
-                    name="email"
-                    type="text"
-                    placeholder="Enter system ID or email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="bg-muted/30 border-none h-12 rounded-2xl pl-11 group-focus-within:ring-2 ring-blue-500/20 transition-all font-medium"
-                   />
-                   <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 group-focus-within:text-blue-600" />
+                <Label htmlFor="userId" className="text-xs font-semibold text-slate-700">Customer ID / User ID</Label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="userId"
+                    placeholder="Enter your Customer ID"
+                    value={userId}
+                    onChange={e => { setUserId(e.target.value); setLoginError('') }}
+                    className="pl-10 h-11 rounded-xl bg-slate-50 border-slate-200 focus:border-blue-400"
+                    autoComplete="username"
+                  />
                 </div>
               </div>
 
+              {/* Password */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between ml-1">
-                  <Label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Access Key</Label>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                       <Button variant="link" className="px-0 font-bold h-auto text-[10px] uppercase tracking-widest text-blue-600 opacity-70 hover:opacity-100" type="button">Lost Access?</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Recovery Protocol</DialogTitle>
-                        <DialogDescription>
-                          Enter your registered identity to initiate a secure recovery sequence via secondary channels.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="rec-email">Secondary Identifier</Label>
-                          <Input id="rec-email" placeholder="Verification Email" className="h-11" />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button type="submit" className="w-full h-11 font-bold">DISPATCH TOKEN</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-xs font-semibold text-slate-700">Password</Label>
+                  <button
+                    type="button"
+                    onClick={() => setForgotOpen(true)}
+                    className="text-xs text-blue-600 font-semibold hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
                 </div>
-                <div className="relative group">
-                   <Input
+                <div className="relative">
+                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
                     id="password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    required
+                    type={showPwd ? 'text' : 'password'}
+                    placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="bg-muted/30 border-none h-12 rounded-2xl pl-11 group-focus-within:ring-2 ring-blue-500/20 transition-all font-medium"
-                   />
-                   <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 group-focus-within:text-blue-600" />
+                    onChange={e => { setPassword(e.target.value); setLoginError('') }}
+                    className="pl-10 pr-10 h-11 rounded-xl bg-slate-50 border-slate-200 focus:border-blue-400"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd(v => !v)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-slate-700"
+                  >
+                    {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
-            </CardContent>
 
-            <CardFooter className="flex flex-col gap-6 pt-2">
-              <Button type="submit" className="w-full h-14 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-blue-500/25 active:scale-[0.98] transition-all" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-3 h-5 w-5 animate-spin" />
-                    DECRYPTING VAULT...
-                  </>
-                ) : (
-                  <>
-                     <Lock className="h-4 w-4 mr-3" /> VERIFY IDENTITY
-                  </>
-                )}
+              <Button
+                type="submit"
+                disabled={loginBusy}
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 font-bold rounded-xl shadow-lg shadow-blue-500/25 text-white"
+              >
+                {loginBusy
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verifying…</>
+                  : 'Login'}
               </Button>
-              
-              <div className="w-full flex items-center gap-4">
-                 <Separator className="flex-1" />
-                 <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Portal Registry</span>
-                 <Separator className="flex-1" />
+            </form>
+
+          </div>
+        )}
+
+        {/* ── STEP 2: OTP verification ───────────────────────────────────────── */}
+        {step === 2 && (
+          <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-border/40 overflow-hidden">
+            <div className="px-7 pt-7 pb-2">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                  <MessageSquare className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">OTP Verification</h2>
+                  <p className="text-sm text-muted-foreground">Enter the OTP sent to your registered mobile</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-7 pb-7 pt-5 space-y-5">
+
+
+              {/* OTP input */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-slate-700">Enter OTP</Label>
+                <div className="flex justify-center py-2">
+                  <InputOTP maxLength={6} value={otp} onChange={setOtp} id="otp-input">
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                    </InputOTPGroup>
+                    <InputOTPSeparator />
+                    <InputOTPGroup>
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 w-full">
-                 <Button variant="outline" className="h-11 rounded-xl font-bold border-border/50 bg-muted/5 group" type="button">
-                    <Cpu className="h-4 w-4 mr-2 group-hover:text-blue-600" /> Hardware
-                 </Button>
-                 <Button variant="outline" className="h-11 rounded-xl font-bold border-border/50 bg-muted/5 group" type="button">
-                    <UserPlus className="h-4 w-4 mr-2 group-hover:text-blue-600" /> Register
-                 </Button>
-              </div>
-            </CardFooter>
-          </form>
-        </Card>
+              <Button
+                onClick={handleVerifyOtp}
+                disabled={otpBusy || otp.length !== 6}
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 font-bold rounded-xl shadow-lg shadow-blue-500/25 text-white"
+              >
+                {otpBusy
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verifying…</>
+                  : 'Verify'}
+              </Button>
 
-        {/* Footer Info */}
-        <div className="mt-12 text-center space-y-4">
-           <div className="flex items-center justify-center gap-6 opacity-40">
-              <div className="flex flex-col items-center">
-                 <IconPair icon={ShieldCheck} label="FIPS 140-2" />
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="text-muted-foreground hover:text-slate-700 font-medium"
+                >
+                  ← Back to Login
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  className="flex items-center gap-1 text-blue-600 font-semibold hover:underline"
+                >
+                  <RefreshCw className="h-3 w-3" />Resend OTP
+                </button>
               </div>
-              <Separator orientation="vertical" className="h-8" />
-              <div className="flex flex-col items-center">
-                 <IconPair icon={Lock} label="SOC 2 Type II" />
-              </div>
-           </div>
-           <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">
-             &copy; 2026 SecureBank Advanced Financial Services. <br />
-             Authorized by Global Prudential Authority. Code: SB-SYS-09AX
-           </p>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-4 opacity-50">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-slate-500" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">256-bit SSL</span>
+            </div>
+            <Separator orientation="vertical" className="h-4" />
+            <div className="flex items-center gap-1.5">
+              <Shield className="h-3.5 w-3.5 text-slate-500" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">RBI Compliant</span>
+            </div>
+          </div>
+          <p className="text-[9px] text-slate-400 font-medium">
+            © 2026 SecureBank. All rights reserved.
+          </p>
         </div>
       </div>
+
+      {/* Forgot Password Dialog */}
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Forgot Password</DialogTitle>
+            <DialogDescription>
+              Enter your Customer ID to receive a password reset link on your registered email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label className="text-xs font-semibold">Customer ID</Label>
+            <Input
+              placeholder="Enter your Customer ID"
+              value={forgotId}
+              onChange={e => setForgotId(e.target.value)}
+              className="h-11"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (!forgotId.trim()) { toast.error('Please enter your Customer ID.'); return }
+                toast.success('Reset link sent', { description: 'Check your registered email for the reset link.' })
+                setForgotOpen(false)
+                setForgotId('')
+              }}
+            >
+              Send Reset Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
-}
-
-function IconPair({ icon: Icon, label }) {
-   return (
-      <div className="flex flex-col items-center gap-1">
-         <Icon className="h-4 w-4" />
-         <span className="text-[8px] font-black uppercase tracking-tighter">{label}</span>
-      </div>
-   )
 }

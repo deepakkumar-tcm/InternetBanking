@@ -24,19 +24,38 @@ import { formatCurrency } from '@/lib/utils'
 // ── CLR constants & helpers ───────────────────────────────────────────────
 const CLR_MIN_SCORE   = 750
 const CLR_BANK_MAX    = 3000000
+const CLR_CARD_MAX    = { 2: 500000, 3: 800000 }  // per card-id max allowed limit
 const CLR_CHECKS = [
-  { id: 'card_status', icon: CreditCard,  label: 'Card & Account Status',   desc: 'Confirming active status' },
-  { id: 'utilization', icon: TrendingUp,  label: 'Credit Utilization',       desc: 'Max allowed: 80%' },
-  { id: 'kyc',         icon: BadgeCheck,  label: 'KYC Verification',         desc: 'Identity documents check' },
-  { id: 'fraud',       icon: Fingerprint, label: 'Fraud Risk Assessment',    desc: 'Device & velocity checks' },
-  { id: 'aml',         icon: Search,      label: 'AML & Sanctions',          desc: 'Anti-money laundering' },
+  { id: 'credit_score',     icon: TrendingUp,  label: 'Credit Score Eligibility', desc: `Min score required: ${750}` },
+  { id: 'card_status',      icon: CreditCard,  label: 'Card & Account Status',    desc: 'Confirming active status' },
+  { id: 'amount_eligibility', icon: Banknote,  label: 'Amount Eligibility',       desc: 'Validating requested amount' },
+  { id: 'utilization',      icon: TrendingUp,  label: 'Credit Utilization',        desc: 'Max allowed: 80%' },
+  { id: 'kyc',              icon: BadgeCheck,  label: 'KYC Verification',          desc: 'Identity documents check' },
+  { id: 'fraud',            icon: Fingerprint, label: 'Fraud Risk Assessment',     desc: 'Device & velocity checks' },
+  { id: 'aml',              icon: Search,      label: 'AML & Sanctions',           desc: 'Anti-money laundering' },
 ]
-const CLR_CUSTOMER = { creditScore: 720, utilizationRatio: 45, kycStatus: 'Verified', amlStatus: 'Clear', riskLevel: 'LOW', fraudRiskScore: 18 }
+const CLR_CUSTOMER = { creditScore: 772, utilizationRatio: 45, kycStatus: 'Verified', amlStatus: 'Clear', riskLevel: 'LOW', fraudRiskScore: 18 }
 
-function clrEvaluate(checkId, card) {
+function clrEvaluate(checkId, card, desired) {
+  if (checkId === 'credit_score') {
+    if (CLR_CUSTOMER.creditScore < CLR_MIN_SCORE)
+      return { status: 'fail', message: `Score ${CLR_CUSTOMER.creditScore} is below minimum ${CLR_MIN_SCORE}` }
+    return { status: 'pass', message: `Score: ${CLR_CUSTOMER.creditScore} — Eligible` }
+  }
   if (checkId === 'card_status') {
     if (card.frozen) return { status: 'fail', message: 'Card is currently frozen. Unfreeze before requesting.' }
     return { status: 'pass', message: 'Card: Active · Account: Active' }
+  }
+  if (checkId === 'amount_eligibility') {
+    const cardMax = CLR_CARD_MAX[card.id] ?? CLR_BANK_MAX
+    if (!desired || desired <= card.limit)
+      return { status: 'fail', message: 'Requested amount must be greater than current limit.' }
+    if (desired > cardMax)
+      return { status: 'fail', message: `₹${clrFmt(desired)} exceeds max allowed ₹${clrFmt(cardMax)} for this card.` }
+    const increaseRatio = (desired - card.limit) / card.limit
+    if (increaseRatio > 1)
+      return { status: 'warn', message: `Large increase (${Math.round(increaseRatio * 100)}% above current) — OTP required.` }
+    return { status: 'pass', message: `₹${clrFmt(desired)} is within eligible range for this card.` }
   }
   if (checkId === 'utilization') {
     if (CLR_CUSTOMER.utilizationRatio > 80) return { status: 'fail', message: `Utilization ${CLR_CUSTOMER.utilizationRatio}% exceeds 80% limit.` }
@@ -72,13 +91,13 @@ const initialCards = [
     id: 2, type: 'Credit Card', name: 'SecureBank Rewards Credit',
     number: '**** **** **** 8765', fullNumber: '5425233430108765', cvv: '456',
     holder: 'RAJESH KUMAR', expiry: '12/27', brand: 'Mastercard',
-    frozen: false, limit: 500000, used: 125000, color: 'from-blue-700 to-indigo-800',
+    frozen: false, limit: 300000, used: 125000, color: 'from-blue-700 to-indigo-800',
   },
   {
     id: 3, type: 'Credit Card', name: 'SecureBank Business Credit',
     number: '**** **** **** 3456', fullNumber: '4916338506083456', cvv: '789',
     holder: 'RAJESH KUMAR', expiry: '06/29', brand: 'Visa',
-    frozen: true, limit: 1000000, used: 230000, color: 'from-violet-700 to-purple-800',
+    frozen: true, limit: 500000, used: 230000, color: 'from-violet-700 to-purple-800',
   },
 ]
 
@@ -268,28 +287,51 @@ export default function Cards() {
   const [clrOtp, setClrOtp]                     = useState('')
   const [clrOtpBusy, setClrOtpBusy]             = useState(false)
   const [clrSRN, setClrSRN]                     = useState('')
+  const [clrSubmittedAt, setClrSubmittedAt]     = useState(null)
 
   const clrCard = creditCards.find(c => c.id === Number(clrCardId))
-  const clrMax  = CLR_BANK_MAX
+  const clrMax  = (clrCard && CLR_CARD_MAX[clrCard.id]) ? CLR_CARD_MAX[clrCard.id] : CLR_BANK_MAX
+
+  // ── CLR manual card entry ────────────────────────────────────────────────
+  const [clrManualNum, setClrManualNum]     = useState('')   // raw 16 digits
+  const [clrManualExp, setClrManualExp]     = useState('')   // MM/YY
+  const [clrManualCvv, setClrManualCvv]     = useState('')
+  const [clrShowCvv, setClrShowCvv]         = useState(false)
+  const [clrShowNum, setClrShowNum]         = useState(false)
+  const [clrNumFocused, setClrNumFocused]   = useState(false)
+  const [clrCardError, setClrCardError]     = useState('')
 
   const openClr = () => {
     setClrOpen(true); setClrStep(1); setClrCardId(''); setClrDesired(0)
     setClrLimitInput(''); setClrLimitError(''); setClrCheckIdx(-1)
     setClrCheckResults({}); setClrDone(false); setClrResult(null)
     setClrOtp(''); setClrOtpBusy(false); setClrSRN('')
+    setClrManualNum(''); setClrManualExp(''); setClrManualCvv('')
+    setClrShowCvv(false); setClrShowNum(false); setClrCardError('')
   }
   const closeClr = () => setClrOpen(false)
 
-  const clrSelectCard = (id) => {
-    setClrCardId(id)
-    const c = creditCards.find(x => x.id === Number(id))
-    if (c) { setClrDesired(c.limit); setClrLimitInput(String(c.limit)) }
-  }
-
   const clrProceedCard = () => {
-    if (!clrCardId) { toast.error('Please select a credit card.'); return }
-    const c = creditCards.find(x => x.id === Number(clrCardId))
-    if (c) { setClrDesired(c.limit); setClrLimitInput(String(c.limit)) }
+    if (clrManualNum.length !== 16) {
+      setClrCardError('Please enter a valid 16-digit card number'); return
+    }
+    if (!/^\d{2}\/\d{2}$/.test(clrManualExp)) {
+      setClrCardError('Please enter a valid expiry date (MM/YY)'); return
+    }
+    if (clrManualCvv.length < 3) {
+      setClrCardError('Please enter a valid CVV'); return
+    }
+    const matched = creditCards.find(c =>
+      c.fullNumber.slice(-4) === clrManualNum.slice(-4) &&
+      c.cvv === clrManualCvv &&
+      c.expiry === clrManualExp
+    )
+    if (!matched) { setClrCardError('Card details do not match our records. Please check and try again.'); return }
+    if (cardStates[matched.id]) { setClrCardError('This card is currently frozen. Please unfreeze it first.'); return }
+    setClrCardId(String(matched.id))
+    setClrDesired(matched.limit)
+    setClrLimitInput(String(matched.limit))
+    setClrCardError('')
     setClrStep(2)
   }
 
@@ -304,15 +346,15 @@ export default function Cards() {
     }
     const card = clrCard
     setClrStep(3)
-    setTimeout(() => clrRunChecks(card), 120)
+    setTimeout(() => clrRunChecks(card, clrDesired), 120)
   }
 
-  const clrRunChecks = async (card) => {
+  const clrRunChecks = async (card, desired) => {
     const results = {}
     for (let i = 0; i < CLR_CHECKS.length; i++) {
       setClrCheckIdx(i)
       await new Promise(r => setTimeout(r, 480 + Math.random() * 380))
-      const res = clrEvaluate(CLR_CHECKS[i].id, card)
+      const res = clrEvaluate(CLR_CHECKS[i].id, card, desired)
       results[CLR_CHECKS[i].id] = res
       setClrCheckResults(prev => ({ ...prev, [CLR_CHECKS[i].id]: res }))
       if (res.status === 'fail') { setClrDone(true); setClrResult('fail'); return }
@@ -322,15 +364,15 @@ export default function Cards() {
   }
 
   const clrNextFromChecks = () => {
-    if (clrResult === 'pass')         { setClrStep(5) }
+    if (clrResult === 'pass')              { setClrSubmittedAt(new Date()); setClrStep(5) }
     else if (clrResult === 'otp_required') { setClrStep(4) }
-    else                              { setClrStep(5) }
+    else                                   { setClrSubmittedAt(new Date()); setClrStep(5) }
   }
 
   const clrVerifyOtp = () => {
     if (clrOtp.length !== 6) { toast.error('Enter a 6-digit OTP.'); return }
     setClrOtpBusy(true)
-    setTimeout(() => { setClrOtpBusy(false); setClrStep(5) }, 1500)
+    setTimeout(() => { setClrOtpBusy(false); setClrSubmittedAt(new Date()); setClrStep(5) }, 1500)
   }
 
   const clrProgressPct = clrCheckIdx < 0
@@ -825,7 +867,7 @@ export default function Cards() {
           CREDIT LIMIT INCREASE WIZARD DIALOG
       ══════════════════════════════════════════════════════════════════ */}
       <Dialog open={clrOpen} onOpenChange={closeClr}>
-        <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-y-auto p-0" id="clr-dialog">
+        <DialogContent className="sm:max-w-xl max-h-[92vh] overflow-y-auto p-0" id="clr-dialog">
 
           {/* ── Step 1: Select card ──────────────────────────────────────── */}
           {clrStep === 1 && (
@@ -840,60 +882,116 @@ export default function Cards() {
                     <p className="text-blue-200 text-xs mt-0.5">Select the credit card to upgrade</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  {[
-                    { label: 'Your Score',     value: CLR_CUSTOMER.creditScore, flag: true },
-                    { label: 'Bank Max Limit', value: '₹30L' },
-                  ].map(s => (
-                    <div key={s.label} className="bg-white/10 rounded-xl py-2 px-1">
-                      <p className={`text-base font-black ${s.flag ? (CLR_CUSTOMER.creditScore >= CLR_MIN_SCORE ? 'text-emerald-300' : 'text-red-300') : 'text-white'}`}>{s.value}</p>
-                      <p className="text-[10px] text-blue-200 mt-0.5 leading-tight">{s.label}</p>
-                    </div>
-                  ))}
+                <div className="flex justify-center gap-3">
+                  <div className="bg-white/10 rounded-xl py-2 px-6 text-center">
+                    <p className="text-base font-black text-white">₹3L – ₹8L</p>
+                    <p className="text-[10px] text-blue-200 mt-0.5 leading-tight">Max Limit (per card)</p>
+                  </div>
                 </div>
               </div>
 
               <div className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-widest">Select Credit Card</Label>
-                  <Select value={clrCardId} onValueChange={clrSelectCard}>
-                    <SelectTrigger id="clr-sel-card"><SelectValue placeholder="Choose a credit card" /></SelectTrigger>
-                    <SelectContent>
-                      {creditCards.map(c => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          <div className="flex items-center gap-2">
-                            <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span>{c.name}</span>
-                            <span className="font-mono text-xs text-muted-foreground">{c.number}</span>
-                            {cardStates[c.id] && <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-600 border-amber-200">Frozen</Badge>}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+
+                {/* Card Number */}
+                {/* Card Number — masked by default, eye toggle to reveal */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold uppercase tracking-widest">Card Number</Label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="clr-card-num"
+                      className={`pl-9 pr-10 font-mono tracking-widest text-sm ${clrCardError ? 'border-red-400' : ''}`}
+                      inputMode="numeric"
+                      maxLength={19}
+                      placeholder="•••• •••• •••• ••••"
+                      value={(() => {
+                        const n = clrManualNum
+                        if (!n.length) return ''
+                        if (clrShowNum) return n.match(/.{1,4}/g)?.join(' ') ?? n
+                        return ('•'.repeat(n.length)).match(/.{1,4}/g)?.join(' ') ?? ''
+                      })()}
+                      onPaste={e => {
+                        e.preventDefault()
+                        const digits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 16)
+                        if (digits) { setClrManualNum(digits); setClrShowNum(false); setClrCardError('') }
+                      }}
+                      onChange={e => {
+                        if (clrShowNum) {
+                          setClrManualNum(e.target.value.replace(/\D/g, '').slice(0, 16))
+                        } else {
+                          const oldLen = clrManualNum.length
+                          const newMeaningful = e.target.value.replace(/\s/g, '')
+                          const newLen = newMeaningful.length
+                          if (newLen > oldLen && oldLen < 16) {
+                            const digit = e.target.value.replace(/[•\s]/g, '').slice(-1)
+                            if (/\d/.test(digit)) setClrManualNum(p => (p + digit).slice(0, 16))
+                          } else if (newLen < oldLen) {
+                            setClrManualNum(p => p.slice(0, newLen))
+                          }
+                        }
+                        setClrCardError('')
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setClrShowNum(p => !p)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {clrShowNum ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
-                {clrCard && (
-                  <div className={`rounded-xl bg-gradient-to-br ${clrCard.color} p-4 text-white`}>
-                    <p className="text-[10px] text-white/60 uppercase tracking-widest">{clrCard.brand} · {clrCard.type}</p>
-                    <p className="font-bold text-sm mt-0.5 mb-2">{clrCard.name}</p>
-                    <p className="font-mono tracking-[.2em] text-sm mb-3">{clrCard.number}</p>
-                    <div className="flex justify-between text-xs">
-                      <div>
-                        <p className="text-white/60 text-[10px] uppercase tracking-widest">Current Limit</p>
-                        <p className="font-bold text-base mt-0.5">₹{clrFmt(clrCard.limit)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white/60 text-[10px] uppercase tracking-widest">Available</p>
-                        <p className="font-bold mt-0.5">₹{clrFmt(clrCard.limit - clrCard.used)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white/60 text-[10px] uppercase tracking-widest">Expires</p>
-                        <p className="font-bold mt-0.5">{clrCard.expiry}</p>
-                      </div>
-                    </div>
+                {/* Expiry + CVV */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold uppercase tracking-widest">Expiry Date</Label>
+                    <Input
+                      id="clr-expiry"
+                      className={`font-mono text-sm ${clrCardError ? 'border-red-400' : ''}`}
+                      inputMode="numeric"
+                      maxLength={5}
+                      placeholder="MM/YY"
+                      value={clrManualExp}
+                      onChange={e => {
+                        const raw = e.target.value.replace(/\D/g, '').slice(0, 4)
+                        setClrManualExp(raw.length <= 2 ? raw : raw.slice(0, 2) + '/' + raw.slice(2))
+                        setClrCardError('')
+                      }}
+                    />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold uppercase tracking-widest">CVV</Label>
+                    <Input
+                      id="clr-cvv"
+                      type="password"
+                      className={`font-mono text-sm tracking-widest ${clrCardError ? 'border-red-400' : ''}`}
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="•••"
+                      value={clrManualCvv}
+                      onPaste={e => {
+                        e.preventDefault()
+                        const digits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4)
+                        if (digits) { setClrManualCvv(digits); setClrCardError('') }
+                      }}
+                      onChange={e => {
+                        setClrManualCvv(e.target.value.replace(/\D/g, '').slice(0, 4))
+                        setClrCardError('')
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {clrCardError && (
+                  <p className="text-xs text-red-500 font-medium flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />{clrCardError}
+                  </p>
                 )}
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Your card details are encrypted and never stored. This is only used to verify your identity.
+                </p>
 
                 <div className="flex gap-3 pt-1">
                   <Button variant="outline" onClick={closeClr} className="flex-1">Cancel</Button>
@@ -1034,8 +1132,43 @@ export default function Cards() {
                 </DialogTitle>
                 <DialogDescription>{!clrDone ? 'Please wait while we verify your eligibility.' : ''}</DialogDescription>
               </DialogHeader>
-              <Progress value={clrProgressPct} className="h-2" />
-              <p className="text-xs text-muted-foreground text-right">{clrProgressPct}% complete</p>
+              {/* Step-circle progress indicator */}
+              <div className="flex items-center justify-between px-1 py-2">
+                {CLR_CHECKS.map((chk, i) => {
+                  const res      = clrCheckResults[chk.id]
+                  const isActive = clrCheckIdx === i && !res
+                  const isPast   = !!res
+                  const isFail   = res?.status === 'fail'
+                  const isWarn   = res?.status === 'warn'
+                  return (
+                    <div key={chk.id} className="flex items-center flex-1 last:flex-none">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all
+                          ${isFail   ? 'bg-red-500    border-red-500    text-white'
+                          : isWarn   ? 'bg-amber-500  border-amber-500  text-white'
+                          : isPast   ? 'bg-emerald-500 border-emerald-500 text-white'
+                          : isActive ? 'bg-blue-50 border-blue-500 text-blue-600 shadow-sm shadow-blue-200'
+                          :            'bg-muted border-muted-foreground/25 text-muted-foreground/50'}`}
+                        >
+                          {isFail   ? <XCircle className="h-4 w-4" />
+                          : isWarn  ? <AlertTriangle className="h-3.5 w-3.5" />
+                          : isPast  ? <Check className="h-4 w-4" />
+                          : isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : i + 1}
+                        </div>
+                        <span className={`text-[9px] font-semibold text-center leading-tight max-w-[52px] truncate
+                          ${isFail ? 'text-red-500' : isWarn ? 'text-amber-500' : isPast ? 'text-emerald-600' : isActive ? 'text-blue-600' : 'text-muted-foreground/50'}`}>
+                          {chk.label.split(' ')[0]}
+                        </span>
+                      </div>
+                      {i < CLR_CHECKS.length - 1 && (
+                        <div className={`flex-1 h-0.5 mx-1 mb-4 rounded-full transition-colors
+                          ${isPast ? 'bg-emerald-400' : 'bg-muted'}`} />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
               <div className="space-y-1.5">
                 {CLR_CHECKS.map((chk, i) => {
                   const res      = clrCheckResults[chk.id]
@@ -1122,14 +1255,18 @@ export default function Cards() {
               {clrCard && (
                 <div className="rounded-xl bg-muted/50 border p-4 text-sm text-left space-y-2 max-w-xs mx-auto">
                   {[
-                    ['Card',             clrCard.number],
-                    ['Current Limit',    `₹${clrFmt(clrCard.limit)}`],
-                    ['Requested Limit',  `₹${clrFmt(clrDesired)}`],
-                    ['Increase Amount',  `+₹${clrFmt(clrDesired - clrCard.limit)}`],
+                    ['Card',            clrCard.number],
+                    ['Current Limit',   `₹${clrFmt(clrCard.limit)}`],
+                    ['Requested Limit', `₹${clrFmt(clrDesired)}`],
+                    ['Submitted On',    clrSubmittedAt
+                      ? clrSubmittedAt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) +
+                        ' · ' +
+                        clrSubmittedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                      : '—'],
                   ].map(([k, v]) => (
-                    <div key={k} className="flex justify-between items-center">
-                      <span className="text-muted-foreground">{k}</span>
-                      <span className="font-semibold">{v}</span>
+                    <div key={k} className="flex justify-between items-center gap-4">
+                      <span className="text-muted-foreground flex-shrink-0">{k}</span>
+                      <span className="font-semibold text-right">{v}</span>
                     </div>
                   ))}
                   <Separator />

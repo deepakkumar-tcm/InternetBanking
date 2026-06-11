@@ -56,7 +56,7 @@ function InputOTPSlot({
         className
       )}
       {...props}>
-      {char}
+      {char ? '•' : null}
       {hasFakeCaret && (
         <div
           className="pointer-events-none absolute inset-0 flex items-center justify-center">
