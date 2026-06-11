@@ -15,9 +15,8 @@ import { Slider } from '@/components/ui/slider'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel'
 import { Progress } from '@/components/ui/progress'
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import CardSettingsModal from '@/components/CardSettingsModal'
 import { CreditCard, Lock, Unlock, Eye, EyeOff, Settings, Snowflake, Wifi, Loader2, CheckCircle2, Shield, Globe, ShoppingCart, Banknote, TrendingUp, Copy, Check, ChevronDown, ArrowRight, XCircle, AlertTriangle, Fingerprint, BadgeCheck, Search, RotateCcw, Home } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency } from '@/lib/utils'
@@ -224,7 +223,8 @@ export default function Cards() {
   const [isApplying, setIsApplying]               = useState(false)
   const [applicationSuccess, setApplicationSuccess] = useState(false)
   const [cardForm, setCardForm] = useState({ type: '', variant: '', income: '', employment: '' })
-  const [settingsTab, setSettingsTab]             = useState('1')
+  const [csOpen, setCsOpen]                       = useState(false)
+  const [csCard, setCsCard]                       = useState(null)
 
   useEffect(() => { console.log('[ROUTE] Current path:', window.location.pathname) }, [])
 
@@ -425,7 +425,7 @@ export default function Cards() {
                         </Button>
                         <Button
                           variant="ghost" size="icon" className="h-9 w-9"
-                          onClick={() => setSettingsTab(String(card.id))} id={`btn-card-settings-${card.id}`}
+                          onClick={() => { setCsCard(card); setCsOpen(true) }} id={`btn-card-settings-${card.id}`}
                         >
                           <Settings className="h-4 w-4" />
                         </Button>
@@ -493,132 +493,14 @@ export default function Cards() {
         </Carousel>
       </div>
 
-      {/* ── Card Settings Tabs ──────────────────────────────────────────── */}
-      <div id="section-card-settings">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest mb-4">Card Settings</h3>
-        <Tabs value={settingsTab} onValueChange={setSettingsTab} id="card-settings-tabs">
-          <TabsList className="mb-4" id="card-settings-tabslist">
-            {cards.map(c => (
-              <TabsTrigger key={c.id} value={String(c.id)} id={`tab-card-${c.id}`}>
-                ••{c.number.slice(-4)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {cards.map(card => (
-            <TabsContent key={card.id} value={String(card.id)} id={`tab-content-card-${card.id}`}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                {/* Transaction Limit Sliders — state is now at component level */}
-                <Card className="border shadow-sm" id={`card-limit-settings-${card.id}`}>
-                  <CardHeader><CardTitle className="text-sm font-bold">Transaction Limits</CardTitle></CardHeader>
-                  <CardContent className="space-y-6">
-
-                    {/* Daily Spending Limit */}
-                    <div className="space-y-2" id={`slider-daily-${card.id}`}>
-                      <div className="flex justify-between text-sm">
-                        <Label className="font-medium">Daily Spending Limit</Label>
-                        <Badge variant="outline" className="font-mono">
-                          ₹{(sliderValues[card.id]?.daily[0] ?? 0).toLocaleString('en-IN')}
-                        </Badge>
-                      </div>
-                      <Slider
-                        id={`slider-input-daily-${card.id}`}
-                        min={0} max={card.limit} step={1000}
-                        value={sliderValues[card.id]?.daily ?? [0]}
-                        onValueChange={v => updateSlider(card.id, 'daily', v)}
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>₹0</span><span>₹{card.limit.toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-
-                    {/* ATM Withdrawal Limit */}
-                    <div className="space-y-2" id={`slider-atm-${card.id}`}>
-                      <div className="flex justify-between text-sm">
-                        <Label className="font-medium">ATM Withdrawal Limit</Label>
-                        <Badge variant="outline" className="font-mono">
-                          ₹{(sliderValues[card.id]?.atm[0] ?? 0).toLocaleString('en-IN')}
-                        </Badge>
-                      </div>
-                      <Slider
-                        id={`slider-input-atm-${card.id}`}
-                        min={0} max={50000} step={1000}
-                        value={sliderValues[card.id]?.atm ?? [0]}
-                        onValueChange={v => updateSlider(card.id, 'atm', v)}
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>₹0</span><span>₹50,000</span>
-                      </div>
-                    </div>
-
-                    <Button
-                      className="w-full" id={`btn-save-limits-${card.id}`}
-                      onClick={() => toast.success('Limits updated!')}
-                    >
-                      Save Limits
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Feature Toggles */}
-                <Card className="border shadow-sm" id={`card-features-${card.id}`}>
-                  <CardHeader><CardTitle className="text-sm font-bold">Card Features</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
-                    {[
-                      { key: 'contactless', label: 'Contactless Payments', icon: Wifi,      desc: 'Tap to pay' },
-                      { key: 'online',      label: 'Online Transactions',  icon: ShoppingCart, desc: 'E-commerce & apps' },
-                      { key: 'intl',        label: 'International Usage',  icon: Globe,     desc: 'For overseas transactions' },
-                      { key: 'atm',         label: 'ATM Withdrawals',      icon: Banknote,  desc: 'Cash withdrawal at ATMs' },
-                    ].map(feature => (
-                      <div key={feature.key} className="flex items-center justify-between" id={`switch-${feature.key}-${card.id}`}>
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                            <feature.icon className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{feature.label}</p>
-                            <p className="text-xs text-muted-foreground">{feature.desc}</p>
-                          </div>
-                        </div>
-                        <Switch
-                          id={`sw-${feature.key}-${card.id}`}
-                          checked={cardSwitches[card.id]?.[feature.key] ?? true}
-                          onCheckedChange={() => toggleSwitch(card.id, feature.key)}
-                        />
-                      </div>
-                    ))}
-                    <Separator />
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="w-full" id={`btn-block-card-${card.id}`}>
-                          <Lock className="h-4 w-4 mr-2" /> Block This Card
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent id={`alert-block-card-${card.id}`}>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Block {card.name}?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            All transactions including pending will be stopped immediately. You can unblock it from card settings anytime.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel id={`btn-cancel-block-${card.id}`}>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            id={`btn-confirm-block-${card.id}`}
-                            className="bg-destructive hover:bg-destructive/90"
-                            onClick={() => toast.warning(`${card.name} has been blocked.`)}
-                          >Block Card</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          ))}
-        </Tabs>
-      </div>
+      {/* ── Card Settings Modal ─────────────────────────────────────────── */}
+      <CardSettingsModal
+        card={csCard}
+        open={csOpen}
+        onClose={() => setCsOpen(false)}
+        isFrozen={csCard ? !!cardStates[csCard.id] : false}
+        onToggleFreeze={toggleFreeze}
+      />
 
       {/* ── Recent Transactions ─────────────────────────────────────────── */}
       <Card className="border shadow-sm">
